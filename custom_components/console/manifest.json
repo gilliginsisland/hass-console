@@ -1,0 +1,16 @@
+{
+  "domain": "console",
+  "name": "HA Console",
+  "version": "1.0.0",
+  "integration_type": "service",
+  "codeowners": [
+    "gilliginsisland"
+  ],
+  "config_flow": false,
+  "requirements": [
+    "ptpython>=3.0.23",
+    "asyncssh>=2.13.2"
+  ],
+  "documentation": "https://github.com/gilliginsisland/hass-aiomonitor",
+  "issue_tracker": "https://github.com/gilliginsisland/hass-aiomonitor/issues"
+}
