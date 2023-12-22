@@ -11,6 +11,6 @@
     "ptpython>=3.0.25",
     "asyncssh>=2.14.2"
   ],
-  "documentation": "https://github.com/gilliginsisland/hass-aiomonitor",
-  "issue_tracker": "https://github.com/gilliginsisland/hass-aiomonitor/issues"
+  "documentation": "https://github.com/gilliginsisland/hass-console",
+  "issue_tracker": "https://github.com/gilliginsisland/hass-console/issues"
 }
