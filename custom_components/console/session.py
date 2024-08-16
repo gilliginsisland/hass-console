@@ -1,6 +1,5 @@
-from typing import Any, Callable, Coroutine, TextIO, cast
-import traceback
-import asyncio
+import contextlib
+from typing import Any, Callable, Generator, TextIO, cast
 
 from prompt_toolkit.application import AppSession, create_app_session
 from prompt_toolkit.data_structures import Size
@@ -41,16 +40,33 @@ class ConsoleSession():
         output: ConsoleOutput,
         app_session: AppSession,
     ) -> None:
-        self.input = input
-        self.output = output
-        self.app_session = app_session
+        self._input = input
+        self._output = output
+        self._app_session = app_session
 
     def data_received(self, data: str) -> None:
-        self.input.send_text(data)
+        self._input.send_text(data)
 
     def terminal_size_changed(self, width: int, height: int) -> None:
-        self.output.size = Size(height, width)
+        self._output.size = Size(height, width)
 
         # Send resize event to the current application.
-        if (app := self.app_session.app):
+        if (app := self._app_session.app):
             app._on_resize()
+
+    def close(self) -> None:
+        self._input.close()
+
+
+@contextlib.contextmanager
+def create_console_session(
+    writer: Callable[[str], Any]
+) -> Generator[ConsoleSession,None, None]:
+    _output = ConsoleOutput(writer)
+    with create_pipe_input() as _input:
+        with create_app_session(input=_input, output=_output) as _app_session:
+            session = ConsoleSession(
+                input=_input, output=_output, app_session=_app_session
+            )
+            yield session
+            session.close()

@@ -10,7 +10,7 @@ async def run_repl(hass: HomeAssistant) -> None:
         'hass': hass,
     }
 
-    def get_namespace():
+    def get_namespace() -> dict[str, Any]:
         return namespace
 
     repl = PythonRepl(
@@ -25,6 +25,8 @@ async def run_repl(hass: HomeAssistant) -> None:
     repl.enable_system_bindings = False
 
     namespace['reveal'] = repl._show_result
+
+    repl.app.output.write('Welcome to the HomeAssistant REPL\n')
 
     # Run REPL interface.
     await repl.run_async()

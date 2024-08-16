@@ -3,8 +3,6 @@ from typing import Any, Final
 from pathlib import Path
 import logging
 
-from prompt_toolkit.application import create_app_session
-from prompt_toolkit.input import create_pipe_input
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, callback
@@ -13,7 +11,7 @@ from homeassistant.components.http import StaticPathConfig
 
 from .const import DATA_SESSIONS, DOMAIN
 from .repl import run_repl
-from .session import ConsoleOutput, ConsoleSession
+from .session import create_console_session
 
 URL_BASE: Final = "/console_static"
 PATH_BASE: Final = str(Path(__file__).parent / 'frontend')
@@ -38,7 +36,7 @@ async def register_panel(hass: HomeAssistant) -> None:
     await panel_custom.async_register_panel(
         hass=hass,
         frontend_url_path=DOMAIN,
-        webcomponent_name="terminal-element",
+        webcomponent_name="terminal-panel",
         sidebar_title=DOMAIN.title(),
         sidebar_icon="mdi:console",
         module_url=f'{URL_BASE}/entrypoint.mjs',
@@ -65,33 +63,21 @@ def ws_create_session(
     msg_id: int = msg["id"]
     session_id: str = msg["session_id"]
 
-    logger = _LOGGER.getChild(session_id)
-
-    def stdout(data: str):
+    def writer(data: str):
         connection.send_event(msg_id, data)
 
     async def interact():
-        logger.info('Initializing session')
+        with create_console_session(writer) as session:
+            connection.subscriptions[msg_id] = session.close
 
-        _output = ConsoleOutput(stdout)
-        with create_pipe_input() as _input:
-            with create_app_session(input=_input, output=_output) as _app_session:
-                @callback
-                def unload() -> None:
-                    logger.info('Connection lost')
-                    _input.close()
-
-                connection.subscriptions[msg_id] = unload
-
-                hass.data[DATA_SESSIONS][session_id] = ConsoleSession(
-                    input=_input, output=_output, app_session=_app_session
-                )
-                try:
-                    await run_repl(hass)
-                except BaseException:
-                    traceback.print_exc()
-                finally:
-                    hass.data[DATA_SESSIONS].pop(session_id)
+            hass.data[DATA_SESSIONS][session_id] = session
+            try:
+                await run_repl(hass)
+            except BaseException:
+                writer(traceback.format_exc())
+                _LOGGER.exception('Error running repl')
+            finally:
+                hass.data[DATA_SESSIONS].pop(session_id)
 
     hass.loop.create_task(interact())
 
@@ -117,13 +103,11 @@ def ws_session_input(
     session_id: str = msg["session_id"]
     data = msg["data"]
 
-    logger = _LOGGER.getChild(session_id)
+    if not (session := hass.data[DATA_SESSIONS].get(session_id)):
+        _LOGGER.debug(f'No session, ignoring msg: {msg}')
+        return
 
-    if (session := hass.data[DATA_SESSIONS].get(session_id)):
-        logger.debug(f'Receved input: {data}')
-        session.data_received(data)
-    else:
-        logger.debug(f'No session, ignoring msg: {msg}')
+    session.data_received(data)
 
 
 @websocket_api.require_admin
@@ -147,10 +131,8 @@ def ws_session_resize(
     cols: int = msg['cols']
     rows: int = msg['rows']
 
-    logger = _LOGGER.getChild(session_id)
+    if not (session := hass.data[DATA_SESSIONS].get(session_id)):
+        _LOGGER.debug(f'No session, ignoring msg: {msg}')
+        return
 
-    if (session := hass.data[DATA_SESSIONS].get(session_id)):
-        logger.debug(f'Terminal resize: ({cols}, {rows})')
-        session.terminal_size_changed(cols, rows)
-    else:
-        logger.debug(f'No session, ignoring msg: {msg}')
+    session.terminal_size_changed(cols, rows)
