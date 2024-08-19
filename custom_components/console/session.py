@@ -19,7 +19,7 @@ class ConsoleOutput(Vt100_Output):
             encoding = "utf-8"
 
             def write(stdout, data: str) -> None:
-                self.writer(data)
+                self.writer(data.replace("\n", "\r\n"))
 
             def isatty(stdout) -> bool:
                 return True
