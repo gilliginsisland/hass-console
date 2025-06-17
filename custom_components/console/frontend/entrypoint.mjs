@@ -183,12 +183,12 @@ class TerminalElement extends HTMLElement {
 		shadow.innerHTML = `
 			<link rel="stylesheet" href="${URL.parse('./@xterm/xterm.min.css', import.meta.url)}">
 			<style>
-				:host {
-					display: block;
-				}
 				.viewport {
 					height: 100%;
-					width: 100%;
+					background: black;
+				}
+				.viewport .terminal {
+					padding: 16px;
 				}
 			</style>
 			<div class="viewport"></div>
@@ -233,12 +233,15 @@ customElements.define("terminal-element", TerminalElement);
 async function loadConfigDashboard() {
 	await customElements.whenDefined("partial-panel-resolver");
 	const ppr = document.createElement("partial-panel-resolver");
-	const routes = ppr.getRoutes([{ component_name: "config", url_path: "a" }]);
-	await routes?.routes?.a?.load?.();
-	await customElements.whenDefined("ha-panel-config");
-	const configRouter = document.createElement("ha-panel-config");
-	await configRouter?.routerOptions?.routes?.dashboard?.load?.();
-	await customElements.whenDefined("ha-config-dashboard");
+	ppr.hass = {
+		panels: [{
+			url_path: "tmp",
+			component_name: "iframe",
+		}]
+	};
+	ppr._updateRoutes();
+	await ppr.routerOptions.routes.tmp.load();
+	await customElements.whenDefined('hass-subpage');
 };
 
 class TerminalPanel extends HTMLElement {
@@ -254,29 +257,14 @@ class TerminalPanel extends HTMLElement {
 		await loadConfigDashboard();
 
 		this.#shadow.innerHTML = `
-			<style>
-				:host {
-					display: block;
-					height: 100vh;
-					width: 100%;
-				}
-				terminal-element {
-					display: block;
-					height: calc(100vh - var(--header-height) - 32px);
-					padding: 16px;
-				}
-			</style>
-
-			<ha-top-app-bar-fixed>
-				<ha-menu-button slot="navigationIcon"></ha-menu-button>
-				<div slot="title">Console</div>
+			<hass-subpage header="Console" main-page>
 				<terminal-element></terminal-element>
-			</ha-top-app-bar-fixed>
+			</hass-subpage>
 		`;
 
 		this.#state.addSyncTargets(
 			...this.#shadow.querySelectorAll(
-				'ha-top-app-bar-fixed, ha-menu-button, terminal-element'
+				'hass-subpage, terminal-element'
 			),
 		);
 	}
